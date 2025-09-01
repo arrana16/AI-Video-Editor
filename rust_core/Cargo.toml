@@ -1,0 +1,10 @@
+[package]
+name = "rust_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]   # <-- static .a is easiest to link in Xcode
+
+[build-dependencies]
+cbindgen = "0.29"

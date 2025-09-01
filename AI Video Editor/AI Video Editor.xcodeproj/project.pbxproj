@@ -1,0 +1,604 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1F02DB662E66607D00772365 /* librust_core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F02DB602E665D1A00772365 /* librust_core.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1F02DB382E665AA300772365 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F02DB1E2E665AA100772365 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1F02DB252E665AA100772365;
+			remoteInfo = "AI Video Editor";
+		};
+		1F02DB422E665AA300772365 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F02DB1E2E665AA100772365 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1F02DB252E665AA100772365;
+			remoteInfo = "AI Video Editor";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1F02DB262E665AA100772365 /* AI Video Editor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AI Video Editor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F02DB372E665AA300772365 /* AI Video EditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "AI Video EditorTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F02DB412E665AA300772365 /* AI Video EditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "AI Video EditorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F02DB602E665D1A00772365 /* librust_core.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = librust_core.a; path = "../rust_core/target/aarch64-apple-darwin/release/librust_core.a"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1F02DB282E665AA100772365 /* AI Video Editor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "AI Video Editor";
+			sourceTree = "<group>";
+		};
+		1F02DB3A2E665AA300772365 /* AI Video EditorTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "AI Video EditorTests";
+			sourceTree = "<group>";
+		};
+		1F02DB442E665AA300772365 /* AI Video EditorUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "AI Video EditorUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1F02DB232E665AA100772365 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F02DB662E66607D00772365 /* librust_core.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB342E665AA300772365 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB3E2E665AA300772365 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1F02DB1D2E665AA100772365 = {
+			isa = PBXGroup;
+			children = (
+				1F02DB282E665AA100772365 /* AI Video Editor */,
+				1F02DB3A2E665AA300772365 /* AI Video EditorTests */,
+				1F02DB442E665AA300772365 /* AI Video EditorUITests */,
+				1F02DB5F2E665D1A00772365 /* Frameworks */,
+				1F02DB272E665AA100772365 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1F02DB272E665AA100772365 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1F02DB262E665AA100772365 /* AI Video Editor.app */,
+				1F02DB372E665AA300772365 /* AI Video EditorTests.xctest */,
+				1F02DB412E665AA300772365 /* AI Video EditorUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1F02DB5F2E665D1A00772365 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F02DB602E665D1A00772365 /* librust_core.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1F02DB252E665AA100772365 /* AI Video Editor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F02DB4B2E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video Editor" */;
+			buildPhases = (
+				1F02DB672E66618000772365 /* ShellScript */,
+				1F02DB222E665AA100772365 /* Sources */,
+				1F02DB232E665AA100772365 /* Frameworks */,
+				1F02DB242E665AA100772365 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1F02DB282E665AA100772365 /* AI Video Editor */,
+			);
+			name = "AI Video Editor";
+			packageProductDependencies = (
+			);
+			productName = "AI Video Editor";
+			productReference = 1F02DB262E665AA100772365 /* AI Video Editor.app */;
+			productType = "com.apple.product-type.application";
+		};
+		1F02DB362E665AA300772365 /* AI Video EditorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F02DB4E2E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video EditorTests" */;
+			buildPhases = (
+				1F02DB332E665AA300772365 /* Sources */,
+				1F02DB342E665AA300772365 /* Frameworks */,
+				1F02DB352E665AA300772365 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1F02DB392E665AA300772365 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				1F02DB3A2E665AA300772365 /* AI Video EditorTests */,
+			);
+			name = "AI Video EditorTests";
+			packageProductDependencies = (
+			);
+			productName = "AI Video EditorTests";
+			productReference = 1F02DB372E665AA300772365 /* AI Video EditorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		1F02DB402E665AA300772365 /* AI Video EditorUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F02DB512E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video EditorUITests" */;
+			buildPhases = (
+				1F02DB3D2E665AA300772365 /* Sources */,
+				1F02DB3E2E665AA300772365 /* Frameworks */,
+				1F02DB3F2E665AA300772365 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1F02DB432E665AA300772365 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				1F02DB442E665AA300772365 /* AI Video EditorUITests */,
+			);
+			name = "AI Video EditorUITests";
+			packageProductDependencies = (
+			);
+			productName = "AI Video EditorUITests";
+			productReference = 1F02DB412E665AA300772365 /* AI Video EditorUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1F02DB1E2E665AA100772365 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					1F02DB252E665AA100772365 = {
+						CreatedOnToolsVersion = 16.2;
+						LastSwiftMigration = 1620;
+					};
+					1F02DB362E665AA300772365 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 1F02DB252E665AA100772365;
+					};
+					1F02DB402E665AA300772365 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 1F02DB252E665AA100772365;
+					};
+				};
+			};
+			buildConfigurationList = 1F02DB212E665AA100772365 /* Build configuration list for PBXProject "AI Video Editor" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1F02DB1D2E665AA100772365;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 1F02DB272E665AA100772365 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1F02DB252E665AA100772365 /* AI Video Editor */,
+				1F02DB362E665AA300772365 /* AI Video EditorTests */,
+				1F02DB402E665AA300772365 /* AI Video EditorUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1F02DB242E665AA100772365 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB352E665AA300772365 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB3F2E665AA300772365 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1F02DB672E66618000772365 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n\n# Explicitly set PATH so cargo and cbindgen can be found\nexport PATH=\"$HOME/.cargo/bin:$PATH\"\n\nRUST_DIR=\"$SRCROOT/../rust_core\"\ncd \"$RUST_DIR\"\n\n# 1. Build Rust only for Apple Silicon\n\"$HOME/.cargo/bin/cargo\" build --release --target aarch64-apple-darwin\n\n# 2. Generate fresh header\n\"$HOME/.cargo/bin/cbindgen\" --config bindings/cbindgen.toml \\\n  --crate rust_core \\\n  --output bindings/include/rust_core.h\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1F02DB222E665AA100772365 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB332E665AA300772365 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F02DB3D2E665AA300772365 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1F02DB392E665AA300772365 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1F02DB252E665AA100772365 /* AI Video Editor */;
+			targetProxy = 1F02DB382E665AA300772365 /* PBXContainerItemProxy */;
+		};
+		1F02DB432E665AA300772365 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1F02DB252E665AA100772365 /* AI Video Editor */;
+			targetProxy = 1F02DB422E665AA300772365 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1F02DB492E665AA300772365 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../rust_core/bindings/include";
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../rust_core/target/aarch64-apple-darwin/release";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		1F02DB4A2E665AA300772365 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../rust_core/bindings/include";
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../rust_core/target/aarch64-apple-darwin/release";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		1F02DB4C2E665AA300772365 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "AI Video Editor/AI_Video_Editor.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"AI Video Editor/Preview Content\"";
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../rust_core/bindings/include";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../rust_core/target/aarch64-apple-darwin/release";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-Editor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "AI Video Editor/AI Video Editor-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1F02DB4D2E665AA300772365 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "AI Video Editor/AI_Video_Editor.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"AI Video Editor/Preview Content\"";
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../rust_core/bindings/include";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../rust_core/target/aarch64-apple-darwin/release";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-Editor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "AI Video Editor/AI Video Editor-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1F02DB4F2E665AA300772365 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-EditorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AI Video Editor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AI Video Editor";
+			};
+			name = Debug;
+		};
+		1F02DB502E665AA300772365 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-EditorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AI Video Editor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AI Video Editor";
+			};
+			name = Release;
+		};
+		1F02DB522E665AA300772365 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-EditorUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "AI Video Editor";
+			};
+			name = Debug;
+		};
+		1F02DB532E665AA300772365 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74UJF5HM7S;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "AVE.AI-Video-EditorUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "AI Video Editor";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F02DB212E665AA100772365 /* Build configuration list for PBXProject "AI Video Editor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F02DB492E665AA300772365 /* Debug */,
+				1F02DB4A2E665AA300772365 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F02DB4B2E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video Editor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F02DB4C2E665AA300772365 /* Debug */,
+				1F02DB4D2E665AA300772365 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F02DB4E2E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video EditorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F02DB4F2E665AA300772365 /* Debug */,
+				1F02DB502E665AA300772365 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1F02DB512E665AA300772365 /* Build configuration list for PBXNativeTarget "AI Video EditorUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1F02DB522E665AA300772365 /* Debug */,
+				1F02DB532E665AA300772365 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1F02DB1E2E665AA100772365 /* Project object */;
+}
