@@ -11,6 +11,33 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct Engine Engine;
+
+struct Engine *engine_new(void);
+
+void engine_free(struct Engine *engine);
+
+void engine_add_clip(struct Engine *engine,
+                     const char *id,
+                     const char *url,
+                     uint64_t in_ms,
+                     uint64_t out_ms,
+                     uintptr_t idx);
+
+void engine_remove_clip(struct Engine *engine, uintptr_t idx);
+
+uintptr_t engine_get_clip_count(const struct Engine *engine);
+
+char *engine_get_clip_id(const struct Engine *engine, uintptr_t idx);
+
+char *engine_get_clip_url(const struct Engine *engine, uintptr_t idx);
+
+uint64_t engine_get_clip_in_point(const struct Engine *engine, uintptr_t idx);
+
+uint64_t engine_get_clip_out_point(const struct Engine *engine, uintptr_t idx);
+
+void free_rust_string(char *ptr);
+
 int32_t add_one(int32_t x);
 
 int32_t multiply_by_two(int32_t x);
