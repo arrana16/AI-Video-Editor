@@ -111,7 +111,7 @@ struct ContentView: View {
         }
         .fileExporter(
             isPresented: $viewModel.showProjectSaver,
-            document: ProjectDocument(content: ""),
+            document: ProjectDocument(engine: viewModel.engine),
             contentType: UTType(filenameExtension: "ave")!,
             defaultFilename: viewModel.projectName ?? "Untitled Project"
         ) { result in
@@ -498,7 +498,7 @@ struct ClipView: View {
 }
 
 class TimelineViewModel: ObservableObject {
-    private let engine = TimelineEngine()
+    let engine = TimelineEngine()
     @Published var clips: [Clip] = []
     @Published var thumbnails: [String: NSImage] = [:]
     @Published var showFileImporter = false
@@ -507,9 +507,13 @@ class TimelineViewModel: ObservableObject {
     @Published var projectName: String?
     @Published var hasUnsavedChanges = false
     
-    var currentProjectPath: String?
+    var currentProjectPath: String? {
+        // The Rust engine is the single source of truth for the path.
+        engine.getCurrentFilePath()
+    }
+    var currentProjectURL: URL?
     
-    private var fileAccessSecurityScopedResources: [URL: Bool] = [:]
+    private static let directoryBookmarkKey = "projectDirectoryBookmark"
     
     var totalDuration: UInt64 {
         clips.reduce(0) { $0 + $1.duration }
@@ -520,6 +524,16 @@ class TimelineViewModel: ObservableObject {
         updateProjectInfo()
     }
     
+    // MARK: - Project Management
+    
+    func newProject() {
+        _ = engine.newProject()
+        refreshClips()
+        updateProjectInfo()
+        currentProjectURL = nil
+        thumbnails.removeAll()
+    }
+    
     func addClip(url: URL) {
         addClipAt(url: url, position: clips.count)
         updateProjectInfo()
@@ -527,18 +541,7 @@ class TimelineViewModel: ObservableObject {
     }
     
     func addClipAt(url: URL, position: Int) {
-        let startedAccessing = url.startAccessingSecurityScopedResource()
-        fileAccessSecurityScopedResources[url] = startedAccessing
-        
-        do {
-            let bookmarkData = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-            UserDefaults.standard.set(bookmarkData, forKey: "bookmark-\(url.lastPathComponent)")
-        } catch {
-            // Continue even if bookmark creation fails
-        }
-        
-        let options = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
-        let secureAsset = AVURLAsset(url: url, options: options)
+        let _ = url.startAccessingSecurityScopedResource()
         
         let id = url.lastPathComponent
         let clip = Clip(
@@ -553,32 +556,6 @@ class TimelineViewModel: ObservableObject {
         refreshClips()
         
         generateThumbnail(for: url, clipId: id)
-        
-        Task {
-            do {
-                let duration = try await secureAsset.load("duration")
-                if let cmTimeDuration = duration as? CMTime {
-                    let durationMs = UInt64(CMTimeGetSeconds(cmTimeDuration) * 1000)
-                    
-                    if let index = self.clips.firstIndex(where: { $0.id == id }) {
-                        let updatedClip = Clip(
-                            id: id,
-                            url: url.absoluteString,
-                            inPoint: 0,
-                            outPoint: durationMs
-                        )
-                        
-                        DispatchQueue.main.async {
-                            self.engine.removeClip(at: index)
-                            self.engine.addClip(updatedClip, at: index)
-                            self.refreshClips()
-                        }
-                    }
-                }
-            } catch {
-                // Continue even if getting duration fails
-            }
-        }
     }
     
     func removeClip(at index: Int) {
@@ -618,16 +595,7 @@ class TimelineViewModel: ObservableObject {
             let urls = try result.get()
             
             for url in urls {
-                let startedAccessing = url.startAccessingSecurityScopedResource()
-                fileAccessSecurityScopedResources[url] = startedAccessing
-                
-                do {
-                    let bookmarkData = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-                    UserDefaults.standard.set(bookmarkData, forKey: "bookmark-\(url.lastPathComponent)")
-                } catch {
-                    // Continue even if bookmark creation fails
-                }
-                
+                let _ = url.startAccessingSecurityScopedResource()
                 addClip(url: url)
             }
         } catch {
@@ -636,8 +604,6 @@ class TimelineViewModel: ObservableObject {
     }
     
     func cutClip(at index: Int, position: UInt64) {
-        // Verify the index and position values
-        print("Current clips count: \(clips.count)")
         guard index < clips.count else {
             print("Cut failed: Index \(index) out of bounds (clips count: \(clips.count))")
             return
@@ -651,50 +617,35 @@ class TimelineViewModel: ObservableObject {
         
         print("Cutting clip at index \(index): \(clip.id) at position \(position)")
         
-        // Store existing thumbnails to reuse after cutting
         let existingThumbnails = self.thumbnails
         
-        // Perform the cut in the Rust engine
         engine.cutClip(at: index, position: position)
         
-        // Force a refresh of clips from the engine
         clips = engine.getAllClips()
         objectWillChange.send()
         
-        // Manually update thumbnails for the new clips
         if index < clips.count {
             let firstClipId = clips[index].id
             
-            // Get the URL for this clip (it's not optional, so no need for if let)
             let urlString = clips[index].url
             if let url = URL(string: urlString) {
-                // Check if we already have a thumbnail for the source clip
-                // Extract the base part of the ID (before any timestamp suffix)
-                let originalClipIdComponents = firstClipId.split(separator: "-")
-                let originalClipId = originalClipIdComponents.count > 0 ? String(originalClipIdComponents[0]) : ""
-                
-                // Find any thumbnail that has a key starting with the original clip ID
                 let matchingThumbnail: NSImage?
-                if let matchingKey = existingThumbnails.keys.first(where: { $0.hasPrefix(originalClipId) }) {
+                if let matchingKey = existingThumbnails.keys.first(where: { $0.hasPrefix(firstClipId) }) {
                     matchingThumbnail = existingThumbnails[matchingKey]
                 } else {
                     matchingThumbnail = nil
                 }
                 
-                // Use the existing thumbnail if available, otherwise generate a new one
                 if let thumbnail = matchingThumbnail {
                     self.thumbnails[firstClipId] = thumbnail
                     
-                    // Also set for the second clip if it exists
                     if index + 1 < clips.count {
                         let secondClipId = clips[index + 1].id
                         self.thumbnails[secondClipId] = thumbnail
                     }
                     
-                    // Send change notification
                     objectWillChange.send()
                 } else {
-                    // Generate new thumbnails if needed
                     generateThumbnail(for: url, clipId: firstClipId)
                     
                     if index + 1 < clips.count {
@@ -733,7 +684,6 @@ class TimelineViewModel: ObservableObject {
                     imageGenerator.appliesPreferredTrackTransform = true
                     imageGenerator.maximumSize = CGSize(width: 300, height: 300)
                     
-                    // Get thumbnail from middle of clip for better representation
                     let duration = asset.duration.seconds
                     let time = CMTime(seconds: max(1, duration / 2), preferredTimescale: 60)
                     
@@ -763,86 +713,106 @@ class TimelineViewModel: ObservableObject {
         }
     }
     
-    func updateClipRange(at index: Int, inPoint: UInt64, outPoint: UInt64) {
-        engine.updateClipRange(at: index, inPoint: inPoint, outPoint: outPoint)
-        refreshClips()
-    }
-    
-    deinit {
-        for (url, didStartAccessing) in fileAccessSecurityScopedResources {
-            if didStartAccessing {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-    }
-    
-    // MARK: - Project Management
-    
-    func newProject() {
-        _ = engine.newProject()
-        refreshClips()
-        updateProjectInfo()
-        currentProjectPath = nil
-        thumbnails.removeAll()
-    }
-    
     func saveProject() {
-        guard let path = currentProjectPath else { return }
-        if engine.saveProject(to: path) {
-            updateProjectInfo()
-            print("Project saved successfully to \(path)")
+        print("TimelineViewModel.saveProject - Function called")
+        
+        // If we have a URL, save directly to it (Save).
+        if let url = currentProjectURL {
+            print("TimelineViewModel.saveProject - Existing URL found: \(url.path). Performing direct save.")
+            
+            guard let jsonString = engine.getProjectAsJson(),
+                  let data = jsonString.data(using: .utf8) else {
+                print("TimelineViewModel.saveProject - Failed to get project data from engine.")
+                return
+            }
+            
+            let gotAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if gotAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            
+            do {
+                try data.write(to: url, options: .atomic)
+                print("TimelineViewModel.saveProject - Successfully wrote data to \(url.path).")
+                
+                engine.markAsSaved()
+                updateProjectInfo()
+                
+            } catch {
+                print("TimelineViewModel.saveProject - Error writing file: \(error.localizedDescription)")
+            }
+            
         } else {
-            print("Failed to save project")
+            // If no URL, this is the first save, so show the "Save As" dialog.
+            print("TimelineViewModel.saveProject - No existing URL. Showing file exporter.")
+            showProjectSaver = true
         }
     }
     
     func handleProjectOpen(_ result: Result<[URL], Error>) {
+        print("TimelineViewModel.handleProjectOpen - Function called")
+        
+        guard case .success(let urls) = result, let url = urls.first else {
+            print("TimelineViewModel.handleProjectOpen - No URL provided or error.")
+            return
+        }
+        
+        let gotAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if gotAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        
         do {
-            let urls = try result.get()
-            guard let url = urls.first else { return }
+            let data = try Data(contentsOf: url)
+            guard let jsonString = String(data: data, encoding: .utf8) else {
+                print("TimelineViewModel.handleProjectOpen - Could not decode data to string.")
+                return
+            }
             
-            let path = url.path
-            if engine.loadProject(from: path) {
-                currentProjectPath = path
+            if engine.loadProject(fromJson: jsonString) {
+                engine.setCurrentFilePath(url.path)
+                
+                self.currentProjectURL = url
+                
                 refreshClips()
                 updateProjectInfo()
-                
-                // Clear existing thumbnails and regenerate for loaded clips
-                thumbnails.removeAll()
-                for clip in clips {
-                    if let clipUrl = URL(string: clip.url) {
-                        generateThumbnail(for: clipUrl, clipId: clip.id)
-                    }
-                }
-                
-                print("Project loaded successfully from \(path)")
+                regenerateAllThumbnails()
+                print("TimelineViewModel.handleProjectOpen - Project loaded successfully from \(url.path)")
             } else {
-                print("Failed to load project from \(path)")
+                print("TimelineViewModel.handleProjectOpen - Engine failed to load project from JSON.")
             }
         } catch {
-            print("Error opening project: \(error)")
+            print("TimelineViewModel.handleProjectOpen - Error reading file: \(error)")
         }
     }
     
     func handleProjectSave(_ result: Result<URL, Error>) {
-        do {
-            let url = try result.get()
-            var path = url.path
+        print("TimelineViewModel.handleProjectSave - Function called")
+        
+        switch result {
+        case .success(let url):
+            print("TimelineViewModel.handleProjectSave - FileDocument saved to URL: \(url.path)")
+            engine.setCurrentFilePath(url.path)
+            engine.markAsSaved()
             
-            // Ensure .ave extension
-            if !path.hasSuffix(".ave") {
-                path += ".ave"
-            }
+            self.currentProjectURL = url
+            updateProjectInfo()
             
-            if engine.saveProject(to: path) {
-                currentProjectPath = path
-                updateProjectInfo()
-                print("Project saved successfully to \(path)")
-            } else {
-                print("Failed to save project to \(path)")
+        case .failure(let error):
+            print("TimelineViewModel.handleProjectSave - Save operation ended with result: \(error.localizedDescription)")
+        }
+    }
+    
+    private func regenerateAllThumbnails() {
+        thumbnails.removeAll()
+        for clip in clips {
+            if let clipUrl = URL(string: clip.url) {
+                generateThumbnail(for: clipUrl, clipId: clip.id)
             }
-        } catch {
-            print("Error saving project: \(error)")
         }
     }
     
@@ -856,19 +826,25 @@ class TimelineViewModel: ObservableObject {
 struct ProjectDocument: FileDocument {
     static var readableContentTypes: [UTType] { [UTType(filenameExtension: "ave")!] }
     
-    var content: String
+    var jsonData: Data
     
-    init(content: String) {
-        self.content = content
+    init(engine: TimelineEngine) {
+        if let jsonString = engine.getProjectAsJson() {
+            self.jsonData = jsonString.data(using: .utf8) ?? Data()
+        } else {
+            self.jsonData = Data()
+        }
     }
     
     init(configuration: ReadConfiguration) throws {
-        content = ""
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.jsonData = data
     }
     
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        let data = content.data(using: .utf8)!
-        return .init(regularFileWithContents: data)
+        return FileWrapper(regularFileWithContents: jsonData)
     }
 }
 

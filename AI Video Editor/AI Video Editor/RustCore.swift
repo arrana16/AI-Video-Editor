@@ -121,25 +121,39 @@ class TimelineEngine {
     
     // MARK: - Project Management Functions
     
-    func saveProject(to filePath: String) -> Bool {
+    func getProjectAsJson() -> String? {
+        guard let ptr = enginePtr else { return nil }
+        guard let jsonPtr = engine_get_project_as_json(ptr) else { return nil }
+        defer { free_rust_string(jsonPtr) }
+        return String(cString: jsonPtr)
+    }
+
+    func loadProject(fromJson json: String) -> Bool {
         guard let ptr = enginePtr else { return false }
-        return filePath.withCString { pathPtr in
-            engine_save_project(ptr, pathPtr)
+        return json.withCString { jsonPtr in
+            engine_load_project_from_json(ptr, jsonPtr)
         }
     }
-    
-    func loadProject(from filePath: String) -> Bool {
-        guard let ptr = enginePtr else { return false }
-        return filePath.withCString { pathPtr in
-            engine_load_project(ptr, pathPtr)
+
+    func setCurrentFilePath(_ filePath: String?) {
+        guard let ptr = enginePtr else { return }
+        if let path = filePath {
+            path.withCString { pathPtr in
+                engine_set_current_file_path(ptr, pathPtr)
+            }
+        } else {
+            engine_set_current_file_path(ptr, nil)
         }
     }
+
+    func markAsSaved() {
+        guard let ptr = enginePtr else { return }
+        engine_mark_as_saved(ptr)
+    }
     
-    func newProject(name: String = "Untitled Project") -> Bool {
+    func newProject() -> Bool {
         guard let ptr = enginePtr else { return false }
-        return name.withCString { namePtr in
-            engine_new_project(ptr, namePtr)
-        }
+        return engine_new_project(ptr, nil)
     }
     
     func getProjectName() -> String? {
@@ -147,6 +161,13 @@ class TimelineEngine {
         guard let namePtr = engine_get_project_name(ptr) else { return nil }
         defer { free_rust_string(namePtr) }
         return String(cString: namePtr)
+    }
+    
+    func getCurrentFilePath() -> String? {
+        guard let ptr = enginePtr else { return nil }
+        guard let pathPtr = engine_get_current_file_path(ptr) else { return nil }
+        defer { free_rust_string(pathPtr) }
+        return String(cString: pathPtr)
     }
     
     func hasUnsavedChanges() -> Bool {

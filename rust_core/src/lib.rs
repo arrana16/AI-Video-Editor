@@ -1,7 +1,5 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::path::Path;
-use std::fs;
 use serde::{Serialize, Deserialize};
 
 // --------------------
@@ -60,6 +58,7 @@ pub enum Command {
 pub struct Engine {
     pub project: Option<Project>,
     pub current_file_path: Option<String>,
+    pub is_dirty: bool,
 }
 
 pub enum EngineEvent {
@@ -71,6 +70,7 @@ impl Engine {
         Self { 
             project: Some(Project::new("Untitled Project".to_string())),
             current_file_path: None,
+            is_dirty: true, // A new project is unsaved.
         }
     }
 
@@ -140,41 +140,11 @@ impl Engine {
                 }
             }
             project.update_modified_time();
+            self.is_dirty = true; // Any command makes the project dirty.
             EngineEvent::TimelineChanged(project.timeline.clone())
         } else {
             EngineEvent::TimelineChanged(Timeline::default())
         }
-    }
-}
-
-// --------------------
-// Project File I/O
-// --------------------
-pub struct ProjectManager;
-
-impl ProjectManager {
-    pub fn save_project(project: &Project, file_path: &str) -> Result<(), String> {
-        let json_data = serde_json::to_string_pretty(project)
-            .map_err(|e| format!("Failed to serialize project: {}", e))?;
-        
-        fs::write(file_path, json_data)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
-        
-        Ok(())
-    }
-
-    pub fn load_project(file_path: &str) -> Result<Project, String> {
-        if !Path::new(file_path).exists() {
-            return Err("File does not exist".to_string());
-        }
-
-        let json_data = fs::read_to_string(file_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-        
-        let project: Project = serde_json::from_str(&json_data)
-            .map_err(|e| format!("Failed to deserialize project: {}", e))?;
-        
-        Ok(project)
     }
 }
 
@@ -190,18 +160,16 @@ pub extern "C" fn engine_new() -> *mut Engine {
 #[no_mangle]
 pub extern "C" fn engine_free(engine: *mut Engine) {
     if !engine.is_null() {
-        unsafe { let _ = Box::from_raw(engine); }  // Fix the warning by using let _
+        unsafe { let _ = Box::from_raw(engine); }
     }
 }
 
 #[no_mangle]
 pub extern "C" fn engine_add_clip(engine: *mut Engine, id: *const c_char, url: *const c_char, in_ms: u64, out_ms: u64, idx: usize) {
     if engine.is_null() { return; }
-    
     let eng = unsafe { &mut *engine };
     let id = unsafe { CStr::from_ptr(id).to_string_lossy().into_owned() };
     let url = unsafe { CStr::from_ptr(url).to_string_lossy().into_owned() };
-
     let clip = Clip { id, url, in_point: in_ms, out_point: out_ms };
     eng.handle(Command::AddClip(clip, idx));
 }
@@ -209,7 +177,6 @@ pub extern "C" fn engine_add_clip(engine: *mut Engine, id: *const c_char, url: *
 #[no_mangle]
 pub extern "C" fn engine_remove_clip(engine: *mut Engine, idx: usize) {
     if engine.is_null() { return; }
-    
     let eng = unsafe { &mut *engine };
     eng.handle(Command::RemoveClip(idx));
 }
@@ -217,7 +184,6 @@ pub extern "C" fn engine_remove_clip(engine: *mut Engine, idx: usize) {
 #[no_mangle]
 pub extern "C" fn engine_cut_clip(engine: *mut Engine, idx: usize, position: u64) {
     if engine.is_null() { return; }
-    
     let eng = unsafe { &mut *engine };
     eng.handle(Command::CutClip(idx, position));
 }
@@ -225,36 +191,22 @@ pub extern "C" fn engine_cut_clip(engine: *mut Engine, idx: usize, position: u64
 #[no_mangle]
 pub extern "C" fn engine_update_clip_range(engine: *mut Engine, idx: usize, in_point: u64, out_point: u64) {
     if engine.is_null() { return; }
-    
     let eng = unsafe { &mut *engine };
     eng.handle(Command::UpdateClipRange(idx, in_point, out_point));
 }
 
-// Get the number of clips in the timeline
 #[no_mangle]
 pub extern "C" fn engine_get_clip_count(engine: *const Engine) -> usize {
     if engine.is_null() { return 0; }
-    
     let eng = unsafe { &*engine };
-    if let Some(ref project) = eng.project {
-        project.timeline.clips.len()
-    } else {
-        0
-    }
+    eng.project.as_ref().map_or(0, |p| p.timeline.clips.len())
 }
 
-// Get a specific clip's details by index
 #[no_mangle]
 pub extern "C" fn engine_get_clip_id(engine: *const Engine, idx: usize) -> *mut c_char {
     if engine.is_null() { return std::ptr::null_mut(); }
-    
     let eng = unsafe { &*engine };
-    if let Some(ref project) = eng.project {
-        if idx >= project.timeline.clips.len() {
-            return std::ptr::null_mut();
-        }
-        
-        let clip = &project.timeline.clips[idx];
+    if let Some(clip) = eng.project.as_ref().and_then(|p| p.timeline.clips.get(idx)) {
         CString::new(clip.id.clone()).unwrap().into_raw()
     } else {
         std::ptr::null_mut()
@@ -264,14 +216,8 @@ pub extern "C" fn engine_get_clip_id(engine: *const Engine, idx: usize) -> *mut 
 #[no_mangle]
 pub extern "C" fn engine_get_clip_url(engine: *const Engine, idx: usize) -> *mut c_char {
     if engine.is_null() { return std::ptr::null_mut(); }
-    
     let eng = unsafe { &*engine };
-    if let Some(ref project) = eng.project {
-        if idx >= project.timeline.clips.len() {
-            return std::ptr::null_mut();
-        }
-        
-        let clip = &project.timeline.clips[idx];
+    if let Some(clip) = eng.project.as_ref().and_then(|p| p.timeline.clips.get(idx)) {
         CString::new(clip.url.clone()).unwrap().into_raw()
     } else {
         std::ptr::null_mut()
@@ -281,33 +227,15 @@ pub extern "C" fn engine_get_clip_url(engine: *const Engine, idx: usize) -> *mut
 #[no_mangle]
 pub extern "C" fn engine_get_clip_in_point(engine: *const Engine, idx: usize) -> u64 {
     if engine.is_null() { return 0; }
-    
     let eng = unsafe { &*engine };
-    if let Some(ref project) = eng.project {
-        if idx >= project.timeline.clips.len() {
-            return 0;
-        }
-        
-        project.timeline.clips[idx].in_point
-    } else {
-        0
-    }
+    eng.project.as_ref().and_then(|p| p.timeline.clips.get(idx)).map_or(0, |c| c.in_point)
 }
 
 #[no_mangle]
 pub extern "C" fn engine_get_clip_out_point(engine: *const Engine, idx: usize) -> u64 {
     if engine.is_null() { return 0; }
-    
     let eng = unsafe { &*engine };
-    if let Some(ref project) = eng.project {
-        if idx >= project.timeline.clips.len() {
-            return 0;
-        }
-        
-        project.timeline.clips[idx].out_point
-    } else {
-        0
-    }
+    eng.project.as_ref().and_then(|p| p.timeline.clips.get(idx)).map_or(0, |c| c.out_point)
 }
 
 // Free string resources allocated by Rust
@@ -334,42 +262,66 @@ pub extern "C" fn divide_by_two(x: i32) -> i32 {
     x / 2
 }
 
-// Project management FFI functions
+// Project management FFI functions are now data-oriented, not file-oriented.
+
+/// Serializes the current project to a JSON string.
+/// The caller is responsible for freeing the returned string with `free_rust_string`.
 #[no_mangle]
-pub extern "C" fn engine_save_project(engine: *mut Engine, file_path: *const c_char) -> bool {
-    if engine.is_null() || file_path.is_null() { return false; }
-    
+pub extern "C" fn engine_get_project_as_json(engine: *mut Engine) -> *mut c_char {
+    if engine.is_null() { return std::ptr::null_mut(); }
     let eng = unsafe { &mut *engine };
-    let path = unsafe { CStr::from_ptr(file_path).to_string_lossy() };
-    
+
     if let Some(ref project) = eng.project {
-        match ProjectManager::save_project(project, &path) {
-            Ok(()) => {
-                eng.current_file_path = Some(path.to_string());
-                true
-            }
-            Err(_) => false
+        match serde_json::to_string_pretty(project) {
+            Ok(json_string) => CString::new(json_string).unwrap().into_raw(),
+            Err(_) => std::ptr::null_mut(),
         }
     } else {
-        false
+        std::ptr::null_mut()
     }
 }
 
+/// Loads a project from a JSON string. This resets the dirty flag.
 #[no_mangle]
-pub extern "C" fn engine_load_project(engine: *mut Engine, file_path: *const c_char) -> bool {
-    if engine.is_null() || file_path.is_null() { return false; }
-    
+pub extern "C" fn engine_load_project_from_json(engine: *mut Engine, json_data: *const c_char) -> bool {
+    if engine.is_null() || json_data.is_null() { return false; }
     let eng = unsafe { &mut *engine };
-    let path = unsafe { CStr::from_ptr(file_path).to_string_lossy() };
-    
-    match ProjectManager::load_project(&path) {
+    let json = unsafe { CStr::from_ptr(json_data).to_string_lossy() };
+
+    match serde_json::from_str(&json) {
         Ok(project) => {
             eng.project = Some(project);
-            eng.current_file_path = Some(path.to_string());
+            eng.current_file_path = None; // Path is unknown until Swift sets it.
+            eng.is_dirty = false; // A freshly loaded project is not dirty.
             true
         }
-        Err(_) => false
+        Err(e) => {
+            println!("engine_load_project_from_json - Deserialization error: {}", e);
+            false
+        },
     }
+}
+
+/// Sets the current file path in the engine. Swift calls this after a successful save/open.
+#[no_mangle]
+pub extern "C" fn engine_set_current_file_path(engine: *mut Engine, file_path: *const c_char) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+
+    if file_path.is_null() {
+        eng.current_file_path = None;
+    } else {
+        let path = unsafe { CStr::from_ptr(file_path).to_string_lossy().into_owned() };
+        eng.current_file_path = Some(path);
+    }
+}
+
+/// Marks the current project as saved by clearing the dirty flag.
+#[no_mangle]
+pub extern "C" fn engine_mark_as_saved(engine: *mut Engine) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+    eng.is_dirty = false;
 }
 
 #[no_mangle]
@@ -385,6 +337,7 @@ pub extern "C" fn engine_new_project(engine: *mut Engine, name: *const c_char) -
     
     eng.project = Some(Project::new(project_name));
     eng.current_file_path = None;
+    eng.is_dirty = true;
     true
 }
 
@@ -401,16 +354,21 @@ pub extern "C" fn engine_get_project_name(engine: *const Engine) -> *mut c_char 
 }
 
 #[no_mangle]
+pub extern "C" fn engine_get_current_file_path(engine: *const Engine) -> *mut c_char {
+    if engine.is_null() { return std::ptr::null_mut(); }
+    
+    let eng = unsafe { &*engine };
+    if let Some(ref path) = eng.current_file_path {
+        CString::new(path.clone()).unwrap().into_raw()
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn engine_has_unsaved_changes(engine: *const Engine) -> bool {
     if engine.is_null() { return false; }
     
     let eng = unsafe { &*engine };
-    eng.current_file_path.is_none() || {
-        if let Some(ref project) = eng.project {
-            // Simple check: if modified time is more recent than created time
-            project.modified_at != project.created_at
-        } else {
-            false
-        }
-    }
+    eng.is_dirty
 }

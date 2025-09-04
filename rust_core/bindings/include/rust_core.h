@@ -51,13 +51,32 @@ int32_t multiply_by_two(int32_t x);
 
 int32_t divide_by_two(int32_t x);
 
-bool engine_save_project(struct Engine *engine, const char *file_path);
+/**
+ * Serializes the current project to a JSON string.
+ * The caller is responsible for freeing the returned string with `free_rust_string`.
+ */
+char *engine_get_project_as_json(struct Engine *engine);
 
-bool engine_load_project(struct Engine *engine, const char *file_path);
+/**
+ * Loads a project from a JSON string. This resets the dirty flag.
+ */
+bool engine_load_project_from_json(struct Engine *engine, const char *json_data);
+
+/**
+ * Sets the current file path in the engine. Swift calls this after a successful save/open.
+ */
+void engine_set_current_file_path(struct Engine *engine, const char *file_path);
+
+/**
+ * Marks the current project as saved by clearing the dirty flag.
+ */
+void engine_mark_as_saved(struct Engine *engine);
 
 bool engine_new_project(struct Engine *engine, const char *name);
 
 char *engine_get_project_name(const struct Engine *engine);
+
+char *engine_get_current_file_path(const struct Engine *engine);
 
 bool engine_has_unsaved_changes(const struct Engine *engine);
 
