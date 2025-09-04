@@ -26,6 +26,13 @@ void engine_add_clip(struct Engine *engine,
 
 void engine_remove_clip(struct Engine *engine, uintptr_t idx);
 
+void engine_cut_clip(struct Engine *engine, uintptr_t idx, uint64_t position);
+
+void engine_update_clip_range(struct Engine *engine,
+                              uintptr_t idx,
+                              uint64_t in_point,
+                              uint64_t out_point);
+
 uintptr_t engine_get_clip_count(const struct Engine *engine);
 
 char *engine_get_clip_id(const struct Engine *engine, uintptr_t idx);
@@ -43,5 +50,15 @@ int32_t add_one(int32_t x);
 int32_t multiply_by_two(int32_t x);
 
 int32_t divide_by_two(int32_t x);
+
+bool engine_save_project(struct Engine *engine, const char *file_path);
+
+bool engine_load_project(struct Engine *engine, const char *file_path);
+
+bool engine_new_project(struct Engine *engine, const char *name);
+
+char *engine_get_project_name(const struct Engine *engine);
+
+bool engine_has_unsaved_changes(const struct Engine *engine);
 
 #endif  /* RUST_CORE_H */

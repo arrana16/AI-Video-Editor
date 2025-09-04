@@ -82,4 +82,75 @@ class TimelineEngine {
         
         return clips
     }
+    
+    func cutClip(at index: Int, position: UInt64) {
+        guard let ptr = enginePtr else { return }
+        
+        // Verify index is valid
+        let count = getClipCount()
+        guard index < count else {
+            print("TimelineEngine: Cannot cut clip - index \(index) out of bounds (count: \(count))")
+            return
+        }
+        
+        // Get the clip to verify position is valid
+        guard let clip = getClip(at: index) else {
+            print("TimelineEngine: Cannot cut clip - failed to get clip at index \(index)")
+            return
+        }
+        
+        // Verify position is within clip boundaries
+        guard position > clip.inPoint && position < clip.outPoint else {
+            print("TimelineEngine: Cannot cut clip - position \(position) is not within clip range (\(clip.inPoint)-\(clip.outPoint))")
+            return
+        }
+        
+        print("TimelineEngine: Cutting clip at index \(index) at position \(position)")
+        
+        engine_cut_clip(ptr, UInt(index), position)
+        
+        // Verify the cut worked by checking if we now have one more clip
+        let newCount = getClipCount()
+        print("TimelineEngine: After cut, clip count changed from \(count) to \(newCount)")
+    }
+    
+    func updateClipRange(at index: Int, inPoint: UInt64, outPoint: UInt64) {
+        guard let ptr = enginePtr else { return }
+        engine_update_clip_range(ptr, UInt(index), inPoint, outPoint)
+    }
+    
+    // MARK: - Project Management Functions
+    
+    func saveProject(to filePath: String) -> Bool {
+        guard let ptr = enginePtr else { return false }
+        return filePath.withCString { pathPtr in
+            engine_save_project(ptr, pathPtr)
+        }
+    }
+    
+    func loadProject(from filePath: String) -> Bool {
+        guard let ptr = enginePtr else { return false }
+        return filePath.withCString { pathPtr in
+            engine_load_project(ptr, pathPtr)
+        }
+    }
+    
+    func newProject(name: String = "Untitled Project") -> Bool {
+        guard let ptr = enginePtr else { return false }
+        return name.withCString { namePtr in
+            engine_new_project(ptr, namePtr)
+        }
+    }
+    
+    func getProjectName() -> String? {
+        guard let ptr = enginePtr else { return nil }
+        guard let namePtr = engine_get_project_name(ptr) else { return nil }
+        defer { free_rust_string(namePtr) }
+        return String(cString: namePtr)
+    }
+    
+    func hasUnsavedChanges() -> Bool {
+        guard let ptr = enginePtr else { return false }
+        return engine_has_unsaved_changes(ptr)
+    }
 }

@@ -18,7 +18,48 @@ struct ContentView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
+            // Project name display
+            if let projectName = viewModel.projectName {
+                HStack {
+                    Text(projectName)
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    if viewModel.hasUnsavedChanges {
+                        Text("•")
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+            
             HStack {
+                Button("New Project") {
+                    viewModel.newProject()
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Open Project") {
+                    viewModel.showProjectOpener = true
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Save Project") {
+                    if viewModel.currentProjectPath != nil {
+                        viewModel.saveProject()
+                    } else {
+                        viewModel.showProjectSaver = true
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.clips.isEmpty)
+                
+                Button("Save As...") {
+                    viewModel.showProjectSaver = true
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.clips.isEmpty)
+                
+                Spacer()
+                
                 Button("Add Media Files") {
                     viewModel.showFileImporter = true
                 }
@@ -53,13 +94,28 @@ struct ContentView: View {
             .cornerRadius(8)
         }
         .padding()
-        .frame(minWidth: 600, minHeight: 400) // Reduced height since debug section is removed
+        .frame(minWidth: 800, minHeight: 400) // Increased width for new buttons
         .fileImporter(
             isPresented: $viewModel.showFileImporter,
             allowedContentTypes: [.movie, .video, .audiovisualContent],
             allowsMultipleSelection: true
         ) { result in
             viewModel.handleFileImport(result)
+        }
+        .fileImporter(
+            isPresented: $viewModel.showProjectOpener,
+            allowedContentTypes: [UTType(filenameExtension: "ave")!],
+            allowsMultipleSelection: false
+        ) { result in
+            viewModel.handleProjectOpen(result)
+        }
+        .fileExporter(
+            isPresented: $viewModel.showProjectSaver,
+            document: ProjectDocument(content: ""),
+            contentType: UTType(filenameExtension: "ave")!,
+            defaultFilename: viewModel.projectName ?? "Untitled Project"
+        ) { result in
+            viewModel.handleProjectSave(result)
         }
         // Add direct file drop support to the whole view
         .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers -> Bool in
@@ -177,6 +233,7 @@ struct TimelineView: View {
                         thumbnail: viewModel.thumbnails[viewModel.clips[index].id],
                         isBeingDragged: draggingClipIndex == index,
                         isDropTarget: dropTargetIndex == index,
+                        viewModel: viewModel, // Pass the actual view model instance
                         onRemove: { idx in
                             viewModel.removeClip(at: idx)
                         }
@@ -264,7 +321,12 @@ struct ClipView: View {
     let thumbnail: NSImage?
     let isBeingDragged: Bool
     let isDropTarget: Bool
+    let viewModel: TimelineViewModel // Add view model parameter
     let onRemove: (Int) -> Void
+    
+    // Add state for cut position
+    @State private var isCutting: Bool = false
+    @State private var cutPosition: Double = 0.5 // Default to middle
     
     var body: some View {
         VStack {
@@ -299,6 +361,23 @@ struct ClipView: View {
                                 .cornerRadius(4),
                             alignment: .topLeading
                         )
+                    
+                    // Add cut indicator if in cutting mode
+                    if isCutting {
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(width: 2, height: 80)
+                            .position(x: max(40, Double(clip.duration) / 50) * cutPosition, y: 40)
+                            .overlay(
+                                Text("Cut")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.white)
+                                    .padding(2)
+                                    .background(Color.red)
+                                    .cornerRadius(2)
+                                    .position(x: max(40, Double(clip.duration) / 50) * cutPosition, y: 15)
+                            )
+                    }
                 } else {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(Color.blue.opacity(0.7))
@@ -322,8 +401,26 @@ struct ClipView: View {
                                 .cornerRadius(4),
                             alignment: .topLeading
                         )
+                    
+                    // Add cut indicator if in cutting mode
+                    if isCutting {
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(width: 2, height: 80)
+                            .position(x: max(40, Double(clip.duration) / 50) * cutPosition, y: 40)
+                            .overlay(
+                                Text("Cut")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.white)
+                                    .padding(2)
+                                    .background(Color.red)
+                                    .cornerRadius(2)
+                                    .position(x: max(40, Double(clip.duration) / 50) * cutPosition, y: 15)
+                            )
+                    }
                 }
                 
+                // Existing remove button
                 Button(action: {
                     onRemove(index)
                 }) {
@@ -334,7 +431,55 @@ struct ClipView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(4)
+                
+                // Add cut button
+                Button(action: {
+                    isCutting.toggle()
+                }) {
+                    Image(systemName: isCutting ? "checkmark.circle.fill" : "scissors")
+                        .foregroundColor(.white)
+                        .background(Circle().fill(Color.black.opacity(0.5)))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(4)
+                .offset(x: -30)
+                
+                // Show confirm cut button when in cutting mode
+                if isCutting {
+                    Button(action: {
+                        // Calculate the actual position in milliseconds
+                        let cutTimeMs = UInt64(Double(clip.duration) * cutPosition) + clip.inPoint
+                        
+                        // Debugging output to verify cut position
+                        print("Cutting clip \(clip.id) at position \(cutTimeMs)ms (in: \(clip.inPoint), out: \(clip.outPoint))")
+                        
+                        // Use the passed view model instance instead of the singleton
+                        viewModel.cutClip(at: index, position: cutTimeMs)
+                        isCutting = false
+                    }) {
+                        Text("Cut")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                    .offset(y: 40)
+                }
             }
+            .contentShape(Rectangle())
+            .gesture(
+                isCutting ?
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let clipWidth = max(80, Double(clip.duration) / 50)
+                            let newPosition = value.location.x / clipWidth
+                            cutPosition = max(0.1, min(0.9, newPosition)) // Keep within 10-90% range
+                        } : nil
+            )
             .opacity(isBeingDragged ? 0.6 : 1.0)
             
             Text("\(formatDuration(clip.duration))")
@@ -357,6 +502,12 @@ class TimelineViewModel: ObservableObject {
     @Published var clips: [Clip] = []
     @Published var thumbnails: [String: NSImage] = [:]
     @Published var showFileImporter = false
+    @Published var showProjectOpener = false
+    @Published var showProjectSaver = false
+    @Published var projectName: String?
+    @Published var hasUnsavedChanges = false
+    
+    var currentProjectPath: String?
     
     private var fileAccessSecurityScopedResources: [URL: Bool] = [:]
     
@@ -366,10 +517,13 @@ class TimelineViewModel: ObservableObject {
     
     init() {
         refreshClips()
+        updateProjectInfo()
     }
     
     func addClip(url: URL) {
         addClipAt(url: url, position: clips.count)
+        updateProjectInfo()
+        print("After adding clip - clips count: \(clips.count)")
     }
     
     func addClipAt(url: URL, position: Int) {
@@ -432,6 +586,7 @@ class TimelineViewModel: ObservableObject {
             let clipId = clips[index].id
             engine.removeClip(at: index)
             refreshClips()
+            updateProjectInfo()
             
             thumbnails.removeValue(forKey: clipId)
         }
@@ -480,8 +635,83 @@ class TimelineViewModel: ObservableObject {
         }
     }
     
+    func cutClip(at index: Int, position: UInt64) {
+        // Verify the index and position values
+        print("Current clips count: \(clips.count)")
+        guard index < clips.count else {
+            print("Cut failed: Index \(index) out of bounds (clips count: \(clips.count))")
+            return
+        }
+        
+        let clip = clips[index]
+        guard position > clip.inPoint && position < clip.outPoint else {
+            print("Cut failed: Position \(position) not within clip range (\(clip.inPoint)-\(clip.outPoint))")
+            return
+        }
+        
+        print("Cutting clip at index \(index): \(clip.id) at position \(position)")
+        
+        // Store existing thumbnails to reuse after cutting
+        let existingThumbnails = self.thumbnails
+        
+        // Perform the cut in the Rust engine
+        engine.cutClip(at: index, position: position)
+        
+        // Force a refresh of clips from the engine
+        clips = engine.getAllClips()
+        objectWillChange.send()
+        
+        // Manually update thumbnails for the new clips
+        if index < clips.count {
+            let firstClipId = clips[index].id
+            
+            // Get the URL for this clip (it's not optional, so no need for if let)
+            let urlString = clips[index].url
+            if let url = URL(string: urlString) {
+                // Check if we already have a thumbnail for the source clip
+                // Extract the base part of the ID (before any timestamp suffix)
+                let originalClipIdComponents = firstClipId.split(separator: "-")
+                let originalClipId = originalClipIdComponents.count > 0 ? String(originalClipIdComponents[0]) : ""
+                
+                // Find any thumbnail that has a key starting with the original clip ID
+                let matchingThumbnail: NSImage?
+                if let matchingKey = existingThumbnails.keys.first(where: { $0.hasPrefix(originalClipId) }) {
+                    matchingThumbnail = existingThumbnails[matchingKey]
+                } else {
+                    matchingThumbnail = nil
+                }
+                
+                // Use the existing thumbnail if available, otherwise generate a new one
+                if let thumbnail = matchingThumbnail {
+                    self.thumbnails[firstClipId] = thumbnail
+                    
+                    // Also set for the second clip if it exists
+                    if index + 1 < clips.count {
+                        let secondClipId = clips[index + 1].id
+                        self.thumbnails[secondClipId] = thumbnail
+                    }
+                    
+                    // Send change notification
+                    objectWillChange.send()
+                } else {
+                    // Generate new thumbnails if needed
+                    generateThumbnail(for: url, clipId: firstClipId)
+                    
+                    if index + 1 < clips.count {
+                        let secondClipId = clips[index + 1].id
+                        generateThumbnail(for: url, clipId: secondClipId)
+                    }
+                }
+            }
+        }
+        
+        print("After cut, clips count: \(clips.count)")
+        updateProjectInfo()
+    }
+    
     private func generateThumbnail(for url: URL, clipId: String) {
         guard url.isFileURL && FileManager.default.fileExists(atPath: url.path) else {
+            print("Cannot generate thumbnail: Invalid URL or file doesn't exist at \(url.path)")
             return
         }
         
@@ -493,28 +723,49 @@ class TimelineViewModel: ObservableObject {
                 var error: NSError?
                 let status = asset.statusOfValue(forKey: "tracks", error: &error)
                 
+                if status == .failed {
+                    print("Failed to load tracks for thumbnail: \(error?.localizedDescription ?? "unknown error")")
+                    return
+                }
+                
                 if status == .loaded {
                     let imageGenerator = AVAssetImageGenerator(asset: asset)
                     imageGenerator.appliesPreferredTrackTransform = true
                     imageGenerator.maximumSize = CGSize(width: 300, height: 300)
                     
-                    let time = CMTime(seconds: 1, preferredTimescale: 60)
+                    // Get thumbnail from middle of clip for better representation
+                    let duration = asset.duration.seconds
+                    let time = CMTime(seconds: max(1, duration / 2), preferredTimescale: 60)
                     
-                    imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak self] _, cgImage, _, result, _ in
+                    print("Generating thumbnail for \(clipId) at \(time.seconds)s")
+                    
+                    imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak self] _, cgImage, _, result, error in
+                        if let error = error {
+                            print("Thumbnail generation error: \(error.localizedDescription)")
+                        }
+                        
                         if result == .succeeded, let cgImage = cgImage {
                             let thumbnail = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
                             
                             DispatchQueue.main.async {
                                 self?.thumbnails[clipId] = thumbnail
                                 self?.objectWillChange.send()
+                                print("Thumbnail generated for \(clipId)")
                             }
+                        } else {
+                            print("Failed to generate thumbnail: result=\(result), error=\(error?.localizedDescription ?? "nil")")
                         }
                     }
                 }
             }
         } catch {
-            // Continue even if thumbnail generation fails
+            print("Exception in thumbnail generation: \(error.localizedDescription)")
         }
+    }
+    
+    func updateClipRange(at index: Int, inPoint: UInt64, outPoint: UInt64) {
+        engine.updateClipRange(at: index, inPoint: inPoint, outPoint: outPoint)
+        refreshClips()
     }
     
     deinit {
@@ -523,6 +774,101 @@ class TimelineViewModel: ObservableObject {
                 url.stopAccessingSecurityScopedResource()
             }
         }
+    }
+    
+    // MARK: - Project Management
+    
+    func newProject() {
+        _ = engine.newProject()
+        refreshClips()
+        updateProjectInfo()
+        currentProjectPath = nil
+        thumbnails.removeAll()
+    }
+    
+    func saveProject() {
+        guard let path = currentProjectPath else { return }
+        if engine.saveProject(to: path) {
+            updateProjectInfo()
+            print("Project saved successfully to \(path)")
+        } else {
+            print("Failed to save project")
+        }
+    }
+    
+    func handleProjectOpen(_ result: Result<[URL], Error>) {
+        do {
+            let urls = try result.get()
+            guard let url = urls.first else { return }
+            
+            let path = url.path
+            if engine.loadProject(from: path) {
+                currentProjectPath = path
+                refreshClips()
+                updateProjectInfo()
+                
+                // Clear existing thumbnails and regenerate for loaded clips
+                thumbnails.removeAll()
+                for clip in clips {
+                    if let clipUrl = URL(string: clip.url) {
+                        generateThumbnail(for: clipUrl, clipId: clip.id)
+                    }
+                }
+                
+                print("Project loaded successfully from \(path)")
+            } else {
+                print("Failed to load project from \(path)")
+            }
+        } catch {
+            print("Error opening project: \(error)")
+        }
+    }
+    
+    func handleProjectSave(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            var path = url.path
+            
+            // Ensure .ave extension
+            if !path.hasSuffix(".ave") {
+                path += ".ave"
+            }
+            
+            if engine.saveProject(to: path) {
+                currentProjectPath = path
+                updateProjectInfo()
+                print("Project saved successfully to \(path)")
+            } else {
+                print("Failed to save project to \(path)")
+            }
+        } catch {
+            print("Error saving project: \(error)")
+        }
+    }
+    
+    private func updateProjectInfo() {
+        projectName = engine.getProjectName()
+        hasUnsavedChanges = engine.hasUnsavedChanges()
+    }
+}
+
+// Document wrapper for file export
+struct ProjectDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [UTType(filenameExtension: "ave")!] }
+    
+    var content: String
+    
+    init(content: String) {
+        self.content = content
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        content = ""
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let data = content.data(using: .utf8)!
+        return .init(regularFileWithContents: data)
     }
 }
 

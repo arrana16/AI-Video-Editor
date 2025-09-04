@@ -1,5 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::path::Path;
+use std::fs;
 use serde::{Serialize, Deserialize};
 
 // --------------------
@@ -18,19 +20,46 @@ pub struct Timeline {
     pub clips: Vec<Clip>, // magnetic ordering
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Project {
+    pub name: String,
+    pub timeline: Timeline,
+    pub created_at: String,
+    pub modified_at: String,
+}
+
+impl Project {
+    pub fn new(name: String) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
+        Self {
+            name,
+            timeline: Timeline::default(),
+            created_at: now.clone(),
+            modified_at: now,
+        }
+    }
+
+    pub fn update_modified_time(&mut self) {
+        self.modified_at = chrono::Utc::now().to_rfc3339();
+    }
+}
+
 // --------------------
 // Commands (from Swift)
 // --------------------
 pub enum Command {
     AddClip(Clip, usize),   // insert at index
     RemoveClip(usize),      // remove by index
+    CutClip(usize, u64),    // cut clip at index at specified position (ms)
+    UpdateClipRange(usize, u64, u64), // update in/out points of a clip
 }
 
 // --------------------
 // Engine (timeline only)
 // --------------------
 pub struct Engine {
-    pub timeline: Timeline,
+    pub project: Option<Project>,
+    pub current_file_path: Option<String>,
 }
 
 pub enum EngineEvent {
@@ -39,25 +68,113 @@ pub enum EngineEvent {
 
 impl Engine {
     pub fn new() -> Self {
-        Self { timeline: Timeline::default() }
+        Self { 
+            project: Some(Project::new("Untitled Project".to_string())),
+            current_file_path: None,
+        }
+    }
+
+    pub fn get_timeline(&self) -> Timeline {
+        self.project.as_ref().map(|p| p.timeline.clone()).unwrap_or_default()
     }
 
     pub fn handle(&mut self, cmd: Command) -> EngineEvent {
-        match cmd {
-            Command::AddClip(clip, idx) => {
-                if idx <= self.timeline.clips.len() {
-                    self.timeline.clips.insert(idx, clip);
-                } else {
-                    self.timeline.clips.push(clip);
+        if let Some(ref mut project) = self.project {
+            match cmd {
+                Command::AddClip(clip, idx) => {
+                    if idx <= project.timeline.clips.len() {
+                        project.timeline.clips.insert(idx, clip);
+                    } else {
+                        project.timeline.clips.push(clip);
+                    }
+                }
+                Command::RemoveClip(idx) => {
+                    if idx < project.timeline.clips.len() {
+                        project.timeline.clips.remove(idx);
+                    }
+                }
+                Command::CutClip(idx, position) => {
+                    if idx < project.timeline.clips.len() {
+                        let clip = &project.timeline.clips[idx];
+                        
+                        // Only cut if position is within the clip's range
+                        if position > clip.in_point && position < clip.out_point {
+                            // Create two new fully independent clips from the original
+                            let timestamp = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis();
+                            
+                            // Use unique identifiers for the new clips
+                            let first_clip = Clip {
+                                id: format!("{}-{}-A", clip.id, timestamp),
+                                url: clip.url.clone(),
+                                in_point: clip.in_point,
+                                out_point: position,
+                            };
+                            
+                            let second_clip = Clip {
+                                id: format!("{}-{}-B", clip.id, timestamp),
+                                url: clip.url.clone(),
+                                in_point: position,
+                                out_point: clip.out_point,
+                            };
+                            
+                            // Remove the original and insert the two new clips
+                            project.timeline.clips.remove(idx);
+                            project.timeline.clips.insert(idx, second_clip);
+                            project.timeline.clips.insert(idx, first_clip);
+                        }
+                    }
+                }
+                Command::UpdateClipRange(idx, in_point, out_point) => {
+                    if idx < project.timeline.clips.len() {
+                        let clip = &mut project.timeline.clips[idx];
+                        
+                        // Only update if the new range is valid
+                        if in_point < out_point {
+                            clip.in_point = in_point;
+                            clip.out_point = out_point;
+                        }
+                    }
                 }
             }
-            Command::RemoveClip(idx) => {
-                if idx < self.timeline.clips.len() {
-                    self.timeline.clips.remove(idx);
-                }
-            }
+            project.update_modified_time();
+            EngineEvent::TimelineChanged(project.timeline.clone())
+        } else {
+            EngineEvent::TimelineChanged(Timeline::default())
         }
-        EngineEvent::TimelineChanged(self.timeline.clone())
+    }
+}
+
+// --------------------
+// Project File I/O
+// --------------------
+pub struct ProjectManager;
+
+impl ProjectManager {
+    pub fn save_project(project: &Project, file_path: &str) -> Result<(), String> {
+        let json_data = serde_json::to_string_pretty(project)
+            .map_err(|e| format!("Failed to serialize project: {}", e))?;
+        
+        fs::write(file_path, json_data)
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+        
+        Ok(())
+    }
+
+    pub fn load_project(file_path: &str) -> Result<Project, String> {
+        if !Path::new(file_path).exists() {
+            return Err("File does not exist".to_string());
+        }
+
+        let json_data = fs::read_to_string(file_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        
+        let project: Project = serde_json::from_str(&json_data)
+            .map_err(|e| format!("Failed to deserialize project: {}", e))?;
+        
+        Ok(project)
     }
 }
 
@@ -73,7 +190,7 @@ pub extern "C" fn engine_new() -> *mut Engine {
 #[no_mangle]
 pub extern "C" fn engine_free(engine: *mut Engine) {
     if !engine.is_null() {
-        unsafe { Box::from_raw(engine) };
+        unsafe { let _ = Box::from_raw(engine); }  // Fix the warning by using let _
     }
 }
 
@@ -97,13 +214,33 @@ pub extern "C" fn engine_remove_clip(engine: *mut Engine, idx: usize) {
     eng.handle(Command::RemoveClip(idx));
 }
 
+#[no_mangle]
+pub extern "C" fn engine_cut_clip(engine: *mut Engine, idx: usize, position: u64) {
+    if engine.is_null() { return; }
+    
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::CutClip(idx, position));
+}
+
+#[no_mangle]
+pub extern "C" fn engine_update_clip_range(engine: *mut Engine, idx: usize, in_point: u64, out_point: u64) {
+    if engine.is_null() { return; }
+    
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::UpdateClipRange(idx, in_point, out_point));
+}
+
 // Get the number of clips in the timeline
 #[no_mangle]
 pub extern "C" fn engine_get_clip_count(engine: *const Engine) -> usize {
     if engine.is_null() { return 0; }
     
     let eng = unsafe { &*engine };
-    eng.timeline.clips.len()
+    if let Some(ref project) = eng.project {
+        project.timeline.clips.len()
+    } else {
+        0
+    }
 }
 
 // Get a specific clip's details by index
@@ -112,12 +249,16 @@ pub extern "C" fn engine_get_clip_id(engine: *const Engine, idx: usize) -> *mut 
     if engine.is_null() { return std::ptr::null_mut(); }
     
     let eng = unsafe { &*engine };
-    if idx >= eng.timeline.clips.len() {
-        return std::ptr::null_mut();
+    if let Some(ref project) = eng.project {
+        if idx >= project.timeline.clips.len() {
+            return std::ptr::null_mut();
+        }
+        
+        let clip = &project.timeline.clips[idx];
+        CString::new(clip.id.clone()).unwrap().into_raw()
+    } else {
+        std::ptr::null_mut()
     }
-    
-    let clip = &eng.timeline.clips[idx];
-    CString::new(clip.id.clone()).unwrap().into_raw()
 }
 
 #[no_mangle]
@@ -125,12 +266,16 @@ pub extern "C" fn engine_get_clip_url(engine: *const Engine, idx: usize) -> *mut
     if engine.is_null() { return std::ptr::null_mut(); }
     
     let eng = unsafe { &*engine };
-    if idx >= eng.timeline.clips.len() {
-        return std::ptr::null_mut();
+    if let Some(ref project) = eng.project {
+        if idx >= project.timeline.clips.len() {
+            return std::ptr::null_mut();
+        }
+        
+        let clip = &project.timeline.clips[idx];
+        CString::new(clip.url.clone()).unwrap().into_raw()
+    } else {
+        std::ptr::null_mut()
     }
-    
-    let clip = &eng.timeline.clips[idx];
-    CString::new(clip.url.clone()).unwrap().into_raw()
 }
 
 #[no_mangle]
@@ -138,11 +283,15 @@ pub extern "C" fn engine_get_clip_in_point(engine: *const Engine, idx: usize) ->
     if engine.is_null() { return 0; }
     
     let eng = unsafe { &*engine };
-    if idx >= eng.timeline.clips.len() {
-        return 0;
+    if let Some(ref project) = eng.project {
+        if idx >= project.timeline.clips.len() {
+            return 0;
+        }
+        
+        project.timeline.clips[idx].in_point
+    } else {
+        0
     }
-    
-    eng.timeline.clips[idx].in_point
 }
 
 #[no_mangle]
@@ -150,11 +299,15 @@ pub extern "C" fn engine_get_clip_out_point(engine: *const Engine, idx: usize) -
     if engine.is_null() { return 0; }
     
     let eng = unsafe { &*engine };
-    if idx >= eng.timeline.clips.len() {
-        return 0;
+    if let Some(ref project) = eng.project {
+        if idx >= project.timeline.clips.len() {
+            return 0;
+        }
+        
+        project.timeline.clips[idx].out_point
+    } else {
+        0
     }
-    
-    eng.timeline.clips[idx].out_point
 }
 
 // Free string resources allocated by Rust
@@ -179,4 +332,85 @@ pub extern "C" fn multiply_by_two(x: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn divide_by_two(x: i32) -> i32 {
     x / 2
+}
+
+// Project management FFI functions
+#[no_mangle]
+pub extern "C" fn engine_save_project(engine: *mut Engine, file_path: *const c_char) -> bool {
+    if engine.is_null() || file_path.is_null() { return false; }
+    
+    let eng = unsafe { &mut *engine };
+    let path = unsafe { CStr::from_ptr(file_path).to_string_lossy() };
+    
+    if let Some(ref project) = eng.project {
+        match ProjectManager::save_project(project, &path) {
+            Ok(()) => {
+                eng.current_file_path = Some(path.to_string());
+                true
+            }
+            Err(_) => false
+        }
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn engine_load_project(engine: *mut Engine, file_path: *const c_char) -> bool {
+    if engine.is_null() || file_path.is_null() { return false; }
+    
+    let eng = unsafe { &mut *engine };
+    let path = unsafe { CStr::from_ptr(file_path).to_string_lossy() };
+    
+    match ProjectManager::load_project(&path) {
+        Ok(project) => {
+            eng.project = Some(project);
+            eng.current_file_path = Some(path.to_string());
+            true
+        }
+        Err(_) => false
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn engine_new_project(engine: *mut Engine, name: *const c_char) -> bool {
+    if engine.is_null() { return false; }
+    
+    let eng = unsafe { &mut *engine };
+    let project_name = if name.is_null() {
+        "Untitled Project".to_string()
+    } else {
+        unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() }
+    };
+    
+    eng.project = Some(Project::new(project_name));
+    eng.current_file_path = None;
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn engine_get_project_name(engine: *const Engine) -> *mut c_char {
+    if engine.is_null() { return std::ptr::null_mut(); }
+    
+    let eng = unsafe { &*engine };
+    if let Some(ref project) = eng.project {
+        CString::new(project.name.clone()).unwrap().into_raw()
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn engine_has_unsaved_changes(engine: *const Engine) -> bool {
+    if engine.is_null() { return false; }
+    
+    let eng = unsafe { &*engine };
+    eng.current_file_path.is_none() || {
+        if let Some(ref project) = eng.project {
+            // Simple check: if modified time is more recent than created time
+            project.modified_at != project.created_at
+        } else {
+            false
+        }
+    }
 }
