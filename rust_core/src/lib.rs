@@ -50,6 +50,27 @@ pub enum Command {
     RemoveClip(usize),      // remove by index
     CutClip(usize, u64),    // cut clip at index at specified position (ms)
     UpdateClipRange(usize, u64, u64), // update in/out points of a clip
+    Play,
+    Pause,
+    Seek(u64),
+    Tick(u64), // delta_ms
+}
+
+// --------------------
+// Playback
+// --------------------
+#[derive(Clone, Debug, Default)]
+pub struct PlaybackState {
+    pub is_playing: bool,
+    pub time_ms: u64, // Global timeline time
+}
+
+// Struct to pass playback info over FFI
+#[repr(C)]
+pub struct PlaybackClipInfo {
+    pub id: *mut c_char,
+    pub url: *mut c_char,
+    pub time_in_clip_ms: u64,
 }
 
 // --------------------
@@ -59,6 +80,7 @@ pub struct Engine {
     pub project: Option<Project>,
     pub current_file_path: Option<String>,
     pub is_dirty: bool,
+    pub playback_state: PlaybackState,
 }
 
 pub enum EngineEvent {
@@ -71,6 +93,7 @@ impl Engine {
             project: Some(Project::new("Untitled Project".to_string())),
             current_file_path: None,
             is_dirty: true, // A new project is unsaved.
+            playback_state: PlaybackState::default(),
         }
     }
 
@@ -80,25 +103,25 @@ impl Engine {
 
     pub fn handle(&mut self, cmd: Command) -> EngineEvent {
         if let Some(ref mut project) = self.project {
-            match cmd {
+            match &cmd {
                 Command::AddClip(clip, idx) => {
-                    if idx <= project.timeline.clips.len() {
-                        project.timeline.clips.insert(idx, clip);
+                    if *idx <= project.timeline.clips.len() {
+                        project.timeline.clips.insert(*idx, clip.clone());
                     } else {
-                        project.timeline.clips.push(clip);
+                        project.timeline.clips.push(clip.clone());
                     }
                 }
                 Command::RemoveClip(idx) => {
-                    if idx < project.timeline.clips.len() {
-                        project.timeline.clips.remove(idx);
+                    if *idx < project.timeline.clips.len() {
+                        project.timeline.clips.remove(*idx);
                     }
                 }
                 Command::CutClip(idx, position) => {
-                    if idx < project.timeline.clips.len() {
-                        let clip = &project.timeline.clips[idx];
+                    if *idx < project.timeline.clips.len() {
+                        let clip = &project.timeline.clips[*idx];
                         
                         // Only cut if position is within the clip's range
-                        if position > clip.in_point && position < clip.out_point {
+                        if *position > clip.in_point && *position < clip.out_point {
                             // Create two new fully independent clips from the original
                             let timestamp = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
@@ -110,41 +133,76 @@ impl Engine {
                                 id: format!("{}-{}-A", clip.id, timestamp),
                                 url: clip.url.clone(),
                                 in_point: clip.in_point,
-                                out_point: position,
+                                out_point: *position,
                             };
                             
                             let second_clip = Clip {
                                 id: format!("{}-{}-B", clip.id, timestamp),
                                 url: clip.url.clone(),
-                                in_point: position,
+                                in_point: *position,
                                 out_point: clip.out_point,
                             };
                             
                             // Remove the original and insert the two new clips
-                            project.timeline.clips.remove(idx);
-                            project.timeline.clips.insert(idx, second_clip);
-                            project.timeline.clips.insert(idx, first_clip);
+                            project.timeline.clips.remove(*idx);
+                            project.timeline.clips.insert(*idx, second_clip);
+                            project.timeline.clips.insert(*idx, first_clip);
                         }
                     }
                 }
                 Command::UpdateClipRange(idx, in_point, out_point) => {
-                    if idx < project.timeline.clips.len() {
-                        let clip = &mut project.timeline.clips[idx];
+                    if *idx < project.timeline.clips.len() {
+                        let clip = &mut project.timeline.clips[*idx];
                         
                         // Only update if the new range is valid
-                        if in_point < out_point {
-                            clip.in_point = in_point;
-                            clip.out_point = out_point;
+                        if *in_point < *out_point {
+                            clip.in_point = *in_point;
+                            clip.out_point = *out_point;
+                        }
+                    }
+                }
+                Command::Play => self.playback_state.is_playing = true,
+                Command::Pause => self.playback_state.is_playing = false,
+                Command::Seek(time) => {
+                    let total_duration = project.timeline.clips.iter().map(|c| c.out_point - c.in_point).sum();
+                    self.playback_state.time_ms = (*time).min(total_duration);
+                },
+                Command::Tick(delta_ms) => {
+                    if self.playback_state.is_playing {
+                        let total_duration: u64 = project.timeline.clips.iter().map(|c| c.out_point - c.in_point).sum();
+                        let new_time = self.playback_state.time_ms + *delta_ms;
+                        if new_time >= total_duration {
+                            self.playback_state.time_ms = total_duration;
+                            self.playback_state.is_playing = false;
+                        } else {
+                            self.playback_state.time_ms = new_time;
                         }
                     }
                 }
             }
-            project.update_modified_time();
-            self.is_dirty = true; // Any command makes the project dirty.
+            if !matches!(cmd, Command::Tick(_)) {
+                project.update_modified_time();
+                self.is_dirty = true; // Any command makes the project dirty.
+            }
             EngineEvent::TimelineChanged(project.timeline.clone())
         } else {
             EngineEvent::TimelineChanged(Timeline::default())
         }
+    }
+
+    pub fn get_clip_for_time(&self) -> Option<(Clip, u64)> { // (Clip, time_within_clip)
+        if let Some(ref project) = self.project {
+            let mut current_time: u64 = 0;
+            for clip in &project.timeline.clips {
+                let clip_duration = clip.out_point - clip.in_point;
+                if self.playback_state.time_ms >= current_time && self.playback_state.time_ms < current_time + clip_duration {
+                    let time_within_clip = clip.in_point + (self.playback_state.time_ms - current_time);
+                    return Some((clip.clone(), time_within_clip));
+                }
+                current_time += clip_duration;
+            }
+        }
+        None
     }
 }
 
@@ -236,6 +294,78 @@ pub extern "C" fn engine_get_clip_out_point(engine: *const Engine, idx: usize) -
     if engine.is_null() { return 0; }
     let eng = unsafe { &*engine };
     eng.project.as_ref().and_then(|p| p.timeline.clips.get(idx)).map_or(0, |c| c.out_point)
+}
+
+// Playback FFI functions
+#[no_mangle]
+pub extern "C" fn engine_play(engine: *mut Engine) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::Play);
+}
+
+#[no_mangle]
+pub extern "C" fn engine_pause(engine: *mut Engine) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::Pause);
+}
+
+#[no_mangle]
+pub extern "C" fn engine_seek(engine: *mut Engine, time_ms: u64) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::Seek(time_ms));
+}
+
+#[no_mangle]
+pub extern "C" fn engine_tick(engine: *mut Engine, delta_ms: u64) {
+    if engine.is_null() { return; }
+    let eng = unsafe { &mut *engine };
+    eng.handle(Command::Tick(delta_ms));
+}
+
+#[no_mangle]
+pub extern "C" fn engine_get_playback_time(engine: *const Engine) -> u64 {
+    if engine.is_null() { return 0; }
+    let eng = unsafe { &*engine };
+    eng.playback_state.time_ms
+}
+
+#[no_mangle]
+pub extern "C" fn engine_is_playing(engine: *const Engine) -> bool {
+    if engine.is_null() { return false; }
+    let eng = unsafe { &*engine };
+    eng.playback_state.is_playing
+}
+
+#[no_mangle]
+pub extern "C" fn engine_get_current_playback_clip_info(engine: *const Engine) -> *mut PlaybackClipInfo {
+    if engine.is_null() { return std::ptr::null_mut(); }
+    let eng = unsafe { &*engine };
+
+    if let Some((clip, time_in_clip_ms)) = eng.get_clip_for_time() {
+        let info = Box::new(PlaybackClipInfo {
+            id: CString::new(clip.id).unwrap().into_raw(),
+            url: CString::new(clip.url).unwrap().into_raw(),
+            time_in_clip_ms,
+        });
+        Box::into_raw(info)
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn free_playback_clip_info(info: *mut PlaybackClipInfo) {
+    if !info.is_null() {
+        unsafe {
+            let a = Box::from_raw(info);
+            // The strings inside were created with CString::into_raw, so we must free them.
+            let _ = CString::from_raw(a.id);
+            let _ = CString::from_raw(a.url);
+        }
+    }
 }
 
 // Free string resources allocated by Rust
@@ -338,6 +468,7 @@ pub extern "C" fn engine_new_project(engine: *mut Engine, name: *const c_char) -
     eng.project = Some(Project::new(project_name));
     eng.current_file_path = None;
     eng.is_dirty = true;
+    eng.playback_state = PlaybackState::default();
     true
 }
 

@@ -19,6 +19,12 @@ struct Clip: Identifiable, Equatable {
     }
 }
 
+struct PlaybackClipInfo {
+    let id: String
+    let url: String
+    let timeInClipMs: UInt64
+}
+
 // MARK: - Timeline Engine Wrapper
 class TimelineEngine {
     private var enginePtr: OpaquePointer?
@@ -117,6 +123,50 @@ class TimelineEngine {
     func updateClipRange(at index: Int, inPoint: UInt64, outPoint: UInt64) {
         guard let ptr = enginePtr else { return }
         engine_update_clip_range(ptr, UInt(index), inPoint, outPoint)
+    }
+    
+    // MARK: - Playback Functions
+    
+    func play() {
+        guard let ptr = enginePtr else { return }
+        engine_play(ptr)
+    }
+    
+    func pause() {
+        guard let ptr = enginePtr else { return }
+        engine_pause(ptr)
+    }
+    
+    func seek(to timeMs: UInt64) {
+        guard let ptr = enginePtr else { return }
+        engine_seek(ptr, timeMs)
+    }
+    
+    func tick(deltaMs: UInt64) {
+        guard let ptr = enginePtr else { return }
+        engine_tick(ptr, deltaMs)
+    }
+    
+    func getPlaybackTime() -> UInt64 {
+        guard let ptr = enginePtr else { return 0 }
+        return engine_get_playback_time(ptr)
+    }
+    
+    func isPlaying() -> Bool {
+        guard let ptr = enginePtr else { return false }
+        return engine_is_playing(ptr)
+    }
+    
+    func getCurrentPlaybackClipInfo() -> PlaybackClipInfo? {
+        guard let ptr = enginePtr else { return nil }
+        guard let infoPtr = engine_get_current_playback_clip_info(ptr) else { return nil }
+        defer { free_playback_clip_info(infoPtr) }
+        
+        let id = String(cString: infoPtr.pointee.id)
+        let url = String(cString: infoPtr.pointee.url)
+        let timeInClipMs = infoPtr.pointee.time_in_clip_ms
+        
+        return PlaybackClipInfo(id: id, url: url, timeInClipMs: timeInClipMs)
     }
     
     // MARK: - Project Management Functions

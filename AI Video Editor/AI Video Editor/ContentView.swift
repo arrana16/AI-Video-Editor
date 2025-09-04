@@ -8,6 +8,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import AVFoundation
+import Combine
+import AVKit
 
 struct ContentView: View {
     @StateObject private var viewModel = TimelineViewModel()
@@ -65,6 +67,8 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+            
+            PlaybackView(viewModel: viewModel)
             
             // Timeline display with file drop zone
             ScrollView(.horizontal, showsIndicators: true) {
@@ -497,8 +501,78 @@ struct ClipView: View {
     }
 }
 
+struct PlaybackView: View {
+    @ObservedObject var viewModel: TimelineViewModel
+    // The player is now owned by the ViewModel. The view just displays it.
+
+    var body: some View {
+        VStack {
+            VideoPlayerContainer(player: viewModel.player) // Use viewModel's player
+                .aspectRatio(16/9, contentMode: .fit)
+                .background(Color.black)
+                .cornerRadius(8)
+                .onChange(of: viewModel.clips) { _ in
+                    // The VM will handle rebuilding its own player's queue
+                    viewModel.rebuildPlayerQueue()
+                }
+
+            HStack {
+                Button(action: {
+                    viewModel.seekToBeginning()
+                }) {
+                    Image(systemName: "backward.to.start.fill")
+                }
+                
+                Button(action: {
+                    viewModel.togglePlayback()
+                }) {
+                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                }
+                
+                Button(action: {
+                    viewModel.seekToEnd()
+                }) {
+                    Image(systemName: "forward.to.end.fill")
+                }
+                
+                Text(formatDuration(viewModel.playbackTime))
+                    .font(.system(.body, design: .monospaced))
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+        }
+        .padding(.bottom)
+    }
+    
+    private func formatDuration(_ milliseconds: UInt64) -> String {
+        let totalSeconds = Double(milliseconds) / 1000
+        let minutes = Int(totalSeconds / 60)
+        let seconds = Int(totalSeconds) % 60
+        let ms = Int(milliseconds) % 1000
+        
+        return String(format: "%02d:%02d.%03d", minutes, seconds, ms)
+    }
+}
+
+struct VideoPlayerContainer: NSViewRepresentable {
+    var player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.player = player
+        view.controlsStyle = .none
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        nsView.player = player
+    }
+}
+
 class TimelineViewModel: ObservableObject {
     let engine = TimelineEngine()
+    let player = AVQueuePlayer() // The VM now owns the player
     @Published var clips: [Clip] = []
     @Published var thumbnails: [String: NSImage] = [:]
     @Published var showFileImporter = false
@@ -506,6 +580,12 @@ class TimelineViewModel: ObservableObject {
     @Published var showProjectSaver = false
     @Published var projectName: String?
     @Published var hasUnsavedChanges = false
+    
+    // Playback State
+    @Published var isPlaying = false
+    @Published var playbackTime: UInt64 = 0
+    
+    private var timeObserver: Any? // For observing player state
     
     var currentProjectPath: String? {
         // The Rust engine is the single source of truth for the path.
@@ -522,6 +602,13 @@ class TimelineViewModel: ObservableObject {
     init() {
         refreshClips()
         updateProjectInfo()
+        setupPlayerObservers()
+    }
+    
+    deinit {
+        if let observer = timeObserver {
+            player.removeTimeObserver(observer)
+        }
     }
     
     // MARK: - Project Management
@@ -532,6 +619,10 @@ class TimelineViewModel: ObservableObject {
         updateProjectInfo()
         currentProjectURL = nil
         thumbnails.removeAll()
+        
+        // Reset playback
+        engine.pause()
+        engine.seek(to: 0)
     }
     
     func addClip(url: URL) {
@@ -587,6 +678,7 @@ class TimelineViewModel: ObservableObject {
     
     func refreshClips() {
         clips = engine.getAllClips()
+        rebuildPlayerQueue()
         objectWillChange.send()
     }
     
@@ -658,6 +750,127 @@ class TimelineViewModel: ObservableObject {
         
         print("After cut, clips count: \(clips.count)")
         updateProjectInfo()
+    }
+    
+    // MARK: - Playback
+    
+    func seekToBeginning() {
+        engine.seek(to: 0)
+        rebuildPlayerQueue() // Rebuilding the queue is the most reliable way to restart
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        // Let togglePlayback handle playing
+    }
+    
+    func seekToEnd() {
+        engine.seek(to: totalDuration)
+        player.pause()
+        // The UI is driven by the engine, so this is sufficient.
+        // togglePlayback will handle restarting if the user hits play.
+    }
+    
+    private func setupPlayerObservers() {
+        // This observer is now the single source of truth for syncing the UI and engine to the player's time.
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1.0 / 30.0, preferredTimescale: 600), queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Update playing state
+            let isPlayerPlaying = self.player.rate > 0
+            if self.isPlaying != isPlayerPlaying {
+                self.isPlaying = isPlayerPlaying
+                if !isPlayerPlaying {
+                    self.engine.pause()
+                }
+            }
+            
+            // Update engine time from player
+            self.updateEngineTimeFromPlayer()
+            
+            // Update UI time from engine
+            self.playbackTime = self.engine.getPlaybackTime()
+        }
+    }
+    
+    private func updateEngineTimeFromPlayer() {
+        guard let currentItem = player.currentItem as? CustomPlayerItem else { return }
+
+        // Find the index of the current clip using its unique ID.
+        guard let currentClipIndex = clips.firstIndex(where: { $0.id == currentItem.clipID }) else {
+            return
+        }
+
+        var timeBeforeCurrentClip: UInt64 = 0
+        for i in 0..<currentClipIndex {
+            timeBeforeCurrentClip += clips[i].duration
+        }
+
+        let currentTimeInSeconds = player.currentTime().seconds
+        guard !currentTimeInSeconds.isNaN else { return }
+
+        // The player's current time *is* the progress within the trimmed clip,
+        // because we are playing an AVComposition.
+        let progressInClip = UInt64(currentTimeInSeconds * 1000)
+
+        let globalTime = timeBeforeCurrentClip + progressInClip
+        engine.seek(to: globalTime)
+    }
+    
+    func togglePlayback() {
+        if player.rate > 0 {
+            player.pause()
+            engine.pause()
+        } else {
+            // If playback finished (current item is nil or at the end), restart from beginning.
+            if player.currentItem == nil || engine.getPlaybackTime() >= totalDuration {
+                seekToBeginning()
+            }
+            player.play()
+            engine.play()
+        }
+    }
+    
+    func rebuildPlayerQueue() {
+        let wasPlaying = player.rate > 0
+        player.pause()
+        player.removeAllItems()
+        
+        let playerItems = clips.compactMap { clip -> AVPlayerItem? in
+            guard let url = URL(string: clip.url) else { return nil }
+
+            let asset = AVURLAsset(url: url)
+            let composition = AVMutableComposition()
+
+            // Define the time range of the clip
+            let startTime = CMTime(seconds: Double(clip.inPoint) / 1000.0, preferredTimescale: 600)
+            let duration = CMTime(seconds: Double(clip.duration) / 1000.0, preferredTimescale: 600)
+            let timeRange = CMTimeRange(start: startTime, duration: duration)
+
+            do {
+                // Insert the desired time range of the source asset into the composition
+                try composition.insertTimeRange(timeRange, of: asset, at: .zero)
+            } catch {
+                print("Error creating composition for clip \(clip.id): \(error)")
+                return nil
+            }
+
+            // Create a custom player item that knows its clip ID
+            return CustomPlayerItem(clipID: clip.id, asset: composition)
+        }
+        
+        playerItems.forEach { player.insert($0, after: nil) }
+        
+        if wasPlaying {
+            player.play()
+        }
+    }
+    
+    // Custom player item to hold our clip's unique ID
+    class CustomPlayerItem: AVPlayerItem {
+        let clipID: String
+
+        init(clipID: String, asset: AVAsset) {
+            self.clipID = clipID
+            super.init(asset: asset, automaticallyLoadedAssetKeys: nil)
+        }
     }
     
     private func generateThumbnail(for url: URL, clipId: String) {

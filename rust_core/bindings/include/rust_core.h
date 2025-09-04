@@ -13,6 +13,12 @@
 
 typedef struct Engine Engine;
 
+typedef struct PlaybackClipInfo {
+  char *id;
+  char *url;
+  uint64_t time_in_clip_ms;
+} PlaybackClipInfo;
+
 struct Engine *engine_new(void);
 
 void engine_free(struct Engine *engine);
@@ -42,6 +48,22 @@ char *engine_get_clip_url(const struct Engine *engine, uintptr_t idx);
 uint64_t engine_get_clip_in_point(const struct Engine *engine, uintptr_t idx);
 
 uint64_t engine_get_clip_out_point(const struct Engine *engine, uintptr_t idx);
+
+void engine_play(struct Engine *engine);
+
+void engine_pause(struct Engine *engine);
+
+void engine_seek(struct Engine *engine, uint64_t time_ms);
+
+void engine_tick(struct Engine *engine, uint64_t delta_ms);
+
+uint64_t engine_get_playback_time(const struct Engine *engine);
+
+bool engine_is_playing(const struct Engine *engine);
+
+struct PlaybackClipInfo *engine_get_current_playback_clip_info(const struct Engine *engine);
+
+void free_playback_clip_info(struct PlaybackClipInfo *info);
 
 void free_rust_string(char *ptr);
 
